@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import { constants as fileSystemConstants } from "node:fs";
 import * as common from "oci-common";
 import * as core from "oci-core";
+import * as identity from "oci-identity";
 
 /** Read and validate an OCI API signing key without exposing raw filesystem errors. */
 async function readPrivateKey(privateKeyPath) {
@@ -48,6 +49,6 @@ export async function createOciClients(config) {
   return {
     computeClient: new core.ComputeClient(clientConfig),
     networkClient: new core.VirtualNetworkClient(clientConfig),
-    identityClient: new common.IdentityClient(clientConfig)
+    identityClient: new identity.IdentityClient(clientConfig)
   };
 }
