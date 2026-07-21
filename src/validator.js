@@ -26,8 +26,15 @@ export async function validateStartup(config, clients, logger) {
     }
   }
   const availabilityDomains = await identityClient.listAvailabilityDomains({ compartmentId: config.tenancyOcid });
-  const adFound = availabilityDomains.items.some((ad) => ad.name === config.availabilityDomain);
-  if (!adFound) throw new Error(`Invalid AD: ${config.availabilityDomain} is not available in this tenancy.`);
+  const availableAdNames = availabilityDomains.items?.map((ad) => ad?.name).filter(Boolean) ?? [];
+  const adFound = availableAdNames.includes(config.availabilityDomain);
+  if (!adFound) {
+    const formattedAdList = availableAdNames.length
+      ? availableAdNames.map((name) => `- ${name}`).join("\n")
+      : "- None returned by OCI";
+    logger.error(`Configured AD:\n${config.availabilityDomain}\n\nAvailable ADs:\n${formattedAdList}`);
+    throw new Error(`Invalid AD.\n\nConfigured AD:\n${config.availabilityDomain}\n\nAvailable ADs:\n${formattedAdList}`);
+  }
   logger.info("Compartment ✓");
   logger.info("Availability Domain ✓");
 
