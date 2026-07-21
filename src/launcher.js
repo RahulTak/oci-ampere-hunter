@@ -30,18 +30,47 @@ export async function launchInstance(computeClient, config) {
 
 /** Wait for the primary VNIC then retrieve its public and private addresses. */
 export async function getInstanceNetworkDetails(computeClient, networkClient, config, instanceId) {
+  let waiters = null;
+  if (typeof computeClient.getWaiters === "function") {
+    try {
+      waiters = computeClient.getWaiters();
+    } catch {
+      // Some OCI SDK versions require callers to create waiters explicitly; poll below instead.
+    }
+  }
+  if (typeof waiters?.forInstance === "function") {
+    const instanceResponse = await waiters.forInstance({ instanceId }, "RUNNING");
+    if (instanceResponse?.instance?.lifecycleState !== "RUNNING") {
+      throw new Error("Instance did not reach RUNNING before VNIC discovery.");
+    }
+  } else {
+    await waitForInstanceRunning(computeClient, instanceId);
+  }
+
   const deadline = Date.now() + NETWORK_DISCOVERY_TIMEOUT_MS;
+  let privateIp = "Unknown";
   while (Date.now() < deadline) {
     const attachments = await computeClient.listVnicAttachments({
       compartmentId: config.compartmentOcid,
       instanceId
     });
-    const primaryAttachment = attachments.items.find((attachment) => attachment.isPrimary && attachment.lifecycleState === "ATTACHED");
+    const primaryAttachment = attachments.items?.find((attachment) => attachment?.isPrimary && attachment.lifecycleState === "ATTACHED");
     if (primaryAttachment?.vnicId) {
       const response = await networkClient.getVnic({ vnicId: primaryAttachment.vnicId });
-      return { publicIp: response.vnic.publicIp || "Not assigned", privateIp: response.vnic.privateIp };
+      privateIp = response.vnic?.privateIp || "Unknown";
+      if (response.vnic?.publicIp) return { publicIp: response.vnic.publicIp, privateIp };
     }
     await sleep(NETWORK_DISCOVERY_INTERVAL_MS);
   }
+  if (privateIp !== "Unknown") return { publicIp: "Not Assigned", privateIp };
   throw new Error("Instance was created, but its primary VNIC was not attached within 10 minutes.");
+}
+
+/** Poll instance lifecycle state only on SDK versions that do not expose the Compute waiter. */
+async function waitForInstanceRunning(computeClient, instanceId) {
+  while (true) {
+    const response = await computeClient.getInstance({ instanceId });
+    if (response.instance?.lifecycleState === "RUNNING") return;
+    await sleep(NETWORK_DISCOVERY_INTERVAL_MS);
+  }
 }

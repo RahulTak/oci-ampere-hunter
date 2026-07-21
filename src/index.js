@@ -9,9 +9,14 @@ import { formatDuration, errorMessage } from "./utils.js";
 import { validateStartup } from "./validator.js";
 
 let shuttingDown = false;
+let shutdownSignalCount = 0;
 
 function requestShutdown(signal) {
-  if (shuttingDown) return;
+  shutdownSignalCount += 1;
+  if (shutdownSignalCount > 1) {
+    logger.warn(`${signal} received again. Force exiting immediately.`);
+    process.exit(130);
+  }
   shuttingDown = true;
   logger.warn(`${signal} received. Stopping hunter cleanly after the current request completes...`);
 }
@@ -25,14 +30,14 @@ function printSuccess(instance, network, config, attempts, startedAt) {
     chalk.green("Instance Created"),
     `Instance Name: ${instance.displayName}`,
     `Instance OCID: ${instance.id}`,
-    `Public IP: ${network.publicIp}`,
-    `Private IP: ${network.privateIp}`,
+    `Public IP: ${network?.publicIp || "Not Assigned"}`,
+    `Private IP: ${network?.privateIp || "Unknown"}`,
     `Availability Domain: ${instance.availabilityDomain}`,
     `Shape: ${instance.shape}`,
     `OCPUs: ${instance.shapeConfig?.ocpus ?? config.ocpus}`,
     `Memory: ${instance.shapeConfig?.memoryInGBs ?? config.memoryInGBs} GB`,
     `Boot Volume Size: ${config.bootVolumeSizeInGBs} GB`,
-    `Launch Time: ${new Date(instance.timeCreated).toISOString()}`,
+    `Launch Time: ${formatLaunchTime(instance?.timeCreated)}`,
     `Elapsed Time: ${formatDuration(Date.now() - startedAt)}`,
     `Attempts: ${attempts}`,
     "Stopping Hunter..."
@@ -40,9 +45,18 @@ function printSuccess(instance, network, config, attempts, startedAt) {
   for (const line of lines) logger.info(line);
 }
 
+/** Format OCI launch time without allowing invalid dates into user output. */
+function formatLaunchTime(timeCreated) {
+  if (!timeCreated) return "Unknown";
+  const launchTime = new Date(timeCreated);
+  return Number.isNaN(launchTime.getTime()) ? "Unknown" : launchTime.toISOString();
+}
+
 async function main() {
   logger.info(chalk.bold(`${APP_NAME} v${APP_VERSION}`));
   const config = loadConfig();
+  logger.info(`Startup configuration | Version: ${APP_VERSION} | Region: ${config.region} | Availability Domain: ${config.availabilityDomain} | Shape: ${config.shape}`);
+  logger.info(`Startup target | Image OCID: ${config.imageOcid} | Subnet OCID: ${config.subnetOcid} | Instance name: ${config.instanceName} | Retry interval: ${config.retryIntervalMs} ms`);
   const clients = await createOciClients(config);
   await validateStartup(config, clients, logger);
   logger.info(`Retry Interval: ${config.retryIntervalMs / 1000} sec`);

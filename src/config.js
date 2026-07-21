@@ -1,5 +1,4 @@
 import "dotenv/config";
-import fs from "node:fs";
 import path from "node:path";
 import {
   DEFAULT_BOOT_VOLUME_SIZE_IN_GBS,
@@ -21,8 +20,6 @@ export function loadConfig(environment = process.env) {
   if (missing.length) throw new Error(`Missing required .env value(s): ${missing.join(", ")}`);
 
   const privateKeyPath = path.resolve(environment.OCI_PRIVATE_KEY_PATH.trim());
-  if (!fs.existsSync(privateKeyPath)) throw new Error(`OCI_PRIVATE_KEY_PATH does not exist: ${privateKeyPath}`);
-  if (!fs.statSync(privateKeyPath).isFile()) throw new Error(`OCI_PRIVATE_KEY_PATH is not a file: ${privateKeyPath}`);
 
   const config = {
     userOcid: environment.OCI_USER_OCID.trim(), tenancyOcid: environment.OCI_TENANCY_OCID.trim(),

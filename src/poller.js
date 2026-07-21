@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { FATAL_HTTP_STATUS_CODES, RETRYABLE_HTTP_STATUS_CODES } from "./constants.js";
 import { buildLaunchRequest } from "./launcher.js";
 import { errorMessage, formatDuration, sleep } from "./utils.js";
@@ -7,9 +8,20 @@ export function classifyLaunchError(error) {
   const code = String(error?.serviceCode || error?.code || "").toLowerCase();
   const message = String(error?.message || "").toLowerCase();
   const status = Number(error?.statusCode);
-  if (code === "outofhostcapacity" || message.includes("outofhostcapacity")) return "capacity";
+  const capacityMessages = ["outofhostcapacity", "out of host capacity", "out of capacity"];
+  if (code === "outofhostcapacity" || capacityMessages.some((capacityMessage) => message.includes(capacityMessage))) return "capacity";
   if (FATAL_HTTP_STATUS_CODES.has(status) || ["notauthenticated", "notauthorized", "invalidparameter", "invalidparametervalue"].includes(code)) return "fatal";
-  if (RETRYABLE_HTTP_STATUS_CODES.has(status) || !status || code.includes("timeout") || code.includes("serviceunavailable")) return "transient";
+  const transientMessages = [
+    "econnreset", "econnrefused", "etimedout", "econnaborted", "socket hang up",
+    "network timeout", "connection reset", "service unavailable", "gateway timeout"
+  ];
+  if (
+    RETRYABLE_HTTP_STATUS_CODES.has(status)
+    || !status
+    || code.includes("timeout")
+    || code.includes("serviceunavailable")
+    || transientMessages.some((transientMessage) => code.includes(transientMessage) || message.includes(transientMessage))
+  ) return "transient";
   return "fatal";
 }
 
@@ -29,16 +41,19 @@ export async function pollForCapacity({ computeClient, config, logger, isShuttin
     } catch (error) {
       const kind = classifyLaunchError(error);
       lastError = errorMessage(error);
+      if (isShuttingDown()) return null;
       if (kind === "fatal") throw new Error(`Launch failed permanently: ${lastError}`, { cause: error });
       logger.warn(kind === "capacity" ? "OutOfHostCapacity" : `Transient OCI/network error: ${lastError}`);
       logger.warn(`Last error: ${lastError}`);
+      const nextRetryAt = new Date(Date.now() + config.retryIntervalMs).toISOString();
+      logger.info(`Retry scheduled | Attempt: ${attempts} | Elapsed: ${formatDuration(Date.now() - startedAt)} | Next retry: ${nextRetryAt} | Retry interval: ${config.retryIntervalMs} ms`);
       logger.info(`Retry countdown: ${config.retryIntervalMs / 1000} seconds. Waiting exactly ${config.retryIntervalMs / 1000} seconds before retrying...`);
       await sleep(config.retryIntervalMs);
-      // Re-use the token after ambiguous transient failures to prevent duplicate instance creation.
-      // Capacity responses are definitive failures, so the next attempt is a new launch request.
+      // Capacity failures definitively create no instance, so their next attempt uses a new token.
+      // Transient failures can occur after OCI accepts a request; reusing the token makes OCI
+      // return the original operation instead of risking a duplicate instance creation.
       if (kind === "capacity") retryToken = crypto.randomUUID();
     }
   }
   return null;
 }
-import crypto from "node:crypto";
