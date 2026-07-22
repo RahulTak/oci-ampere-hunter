@@ -8,7 +8,7 @@ Before it makes any launch request, the hunter authenticates with the API signin
 
 The program makes no changes until the launch request. A successful launch consumes Always Free resources subject to your tenancy limits. Stop it with `Ctrl+C`; it finishes any in-flight SDK request and then exits.
 
-`OutOfHostCapacity`, throttling, timeout, and OCI service/transient network failures wait **exactly 60 seconds** and retry forever. Authentication, authorization, missing-resource, or invalid-request errors stop immediately so they can be corrected.
+`OutOfHostCapacity`, timeout, and OCI service/transient network failures wait **60 seconds** by default and retry forever. HTTP 429 throttling uses an adaptive delay of 120 seconds, then 180 seconds, then 300 seconds for all subsequent consecutive 429s. Any non-429 response resets that 429 sequence. Authentication, authorization, missing-resource, or invalid-request errors stop immediately so they can be corrected.
 
 ## Installation
 
@@ -51,9 +51,13 @@ OCPUS=2
 MEMORY_IN_GBS=12
 BOOT_VOLUME_SIZE_IN_GBS=100
 RETRY_INTERVAL=60000
+DEFAULT_RETRY_MS=60000
+RETRY_429_FIRST_MS=120000
+RETRY_429_SECOND_MS=180000
+RETRY_429_MAX_MS=300000
 ```
 
-`SHAPE` must be `VM.Standard.A1.Flex`, `OCPUS`, `MEMORY_IN_GBS`, and `BOOT_VOLUME_SIZE_IN_GBS` are fixed at `2`, `12`, and `100`, and `RETRY_INTERVAL` must be `60000`.
+`SHAPE` must be `VM.Standard.A1.Flex`, and `OCPUS`, `MEMORY_IN_GBS`, and `BOOT_VOLUME_SIZE_IN_GBS` are fixed at `2`, `12`, and `100`. `DEFAULT_RETRY_MS` supersedes the legacy `RETRY_INTERVAL`; the default is 60 seconds. The optional 429 variables default to 120, 180, and 300 seconds when absent.
 
 ## Run
 

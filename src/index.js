@@ -57,6 +57,7 @@ async function main() {
   const config = loadConfig();
   logger.info(`Startup configuration | Version: ${APP_VERSION} | Region: ${config.region} | Availability Domain: ${config.availabilityDomain} | Shape: ${config.shape}`);
   logger.info(`Startup target | Image OCID: ${config.imageOcid} | Subnet OCID: ${config.subnetOcid} | Instance name: ${config.instanceName} | Retry interval: ${config.retryIntervalMs} ms`);
+  logger.info(`Retry configuration | Default retry: ${config.retryIntervalMs / 1000} sec | 429 first: ${config.retry429FirstMs / 1000} sec | 429 second: ${config.retry429SecondMs / 1000} sec | 429 max: ${config.retry429MaxMs / 1000} sec`);
   const clients = await createOciClients(config);
   await validateStartup(config, clients, logger);
   logger.info(`Retry Interval: ${config.retryIntervalMs / 1000} sec`);

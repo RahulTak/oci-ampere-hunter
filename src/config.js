@@ -4,6 +4,9 @@ import {
   DEFAULT_BOOT_VOLUME_SIZE_IN_GBS,
   DEFAULT_MEMORY_IN_GBS,
   DEFAULT_OCPUS,
+  DEFAULT_RETRY_429_FIRST_MS,
+  DEFAULT_RETRY_429_MAX_MS,
+  DEFAULT_RETRY_429_SECOND_MS,
   DEFAULT_RETRY_INTERVAL_MS,
   REQUIRED_SHAPE
 } from "./constants.js";
@@ -31,13 +34,16 @@ export function loadConfig(environment = process.env) {
     ocpus: parsePositiveNumber(environment.OCPUS || DEFAULT_OCPUS, "OCPUS"),
     memoryInGBs: parsePositiveNumber(environment.MEMORY_IN_GBS || DEFAULT_MEMORY_IN_GBS, "MEMORY_IN_GBS"),
     bootVolumeSizeInGBs: parsePositiveNumber(environment.BOOT_VOLUME_SIZE_IN_GBS || DEFAULT_BOOT_VOLUME_SIZE_IN_GBS, "BOOT_VOLUME_SIZE_IN_GBS"),
-    retryIntervalMs: parsePositiveNumber(environment.RETRY_INTERVAL || DEFAULT_RETRY_INTERVAL_MS, "RETRY_INTERVAL")
+    // DEFAULT_RETRY_MS is the current setting; RETRY_INTERVAL remains a backward-compatible alias.
+    retryIntervalMs: parsePositiveNumber(environment.DEFAULT_RETRY_MS || environment.RETRY_INTERVAL || DEFAULT_RETRY_INTERVAL_MS, "DEFAULT_RETRY_MS"),
+    retry429FirstMs: parsePositiveNumber(environment.RETRY_429_FIRST_MS || DEFAULT_RETRY_429_FIRST_MS, "RETRY_429_FIRST_MS"),
+    retry429SecondMs: parsePositiveNumber(environment.RETRY_429_SECOND_MS || DEFAULT_RETRY_429_SECOND_MS, "RETRY_429_SECOND_MS"),
+    retry429MaxMs: parsePositiveNumber(environment.RETRY_429_MAX_MS || DEFAULT_RETRY_429_MAX_MS, "RETRY_429_MAX_MS")
   };
   if (!config.sshPublicKey.startsWith("ssh-")) throw new Error("SSH_PUBLIC_KEY must be a valid OpenSSH public key beginning with ssh-.");
   if (config.shape !== REQUIRED_SHAPE) throw new Error(`SHAPE must be exactly ${REQUIRED_SHAPE}.`);
   if (config.ocpus !== DEFAULT_OCPUS || config.memoryInGBs !== DEFAULT_MEMORY_IN_GBS || config.bootVolumeSizeInGBs !== DEFAULT_BOOT_VOLUME_SIZE_IN_GBS) {
     throw new Error(`Always Free launch sizing is fixed: OCPUS=${DEFAULT_OCPUS}, MEMORY_IN_GBS=${DEFAULT_MEMORY_IN_GBS}, BOOT_VOLUME_SIZE_IN_GBS=${DEFAULT_BOOT_VOLUME_SIZE_IN_GBS}.`);
   }
-  if (config.retryIntervalMs !== DEFAULT_RETRY_INTERVAL_MS) throw new Error(`RETRY_INTERVAL must be exactly ${DEFAULT_RETRY_INTERVAL_MS} milliseconds (60 seconds).`);
   return Object.freeze(config);
 }
