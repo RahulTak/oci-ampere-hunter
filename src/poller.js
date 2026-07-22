@@ -1,7 +1,27 @@
 import crypto from "node:crypto";
 import { FATAL_HTTP_STATUS_CODES, RETRYABLE_HTTP_STATUS_CODES } from "./constants.js";
 import { buildLaunchRequest } from "./launcher.js";
+import { recordAttempt, recordRetry } from "./runtimeStatus.js";
 import { errorMessage, formatDuration, sleep } from "./utils.js";
+
+/** Suppress only OCI SDK retry chatter; SDK errors still propagate unchanged. */
+async function withoutOciSdkRetryNoise(operation) {
+  const originalConsoleWarn = console.warn;
+  console.warn = (...arguments_) => {
+    const message = String(arguments_[0] || "");
+    if (
+      message.includes("All retry attempts have exhausted")
+      || message.includes("Request failed with Exception")
+      || message.includes("Request cannot be retried. Not Retrying")
+    ) return;
+    originalConsoleWarn(...arguments_);
+  };
+  try {
+    return await operation();
+  } finally {
+    console.warn = originalConsoleWarn;
+  }
+}
 
 /** Classify OCI and network errors without retrying credentials or bad launch configuration. */
 export function classifyLaunchError(error) {
@@ -42,10 +62,11 @@ export async function pollForCapacity({ computeClient, config, logger, isShuttin
   let consecutive429Count = 0;
   while (!isShuttingDown()) {
     attempts += 1;
+    recordAttempt(attempts);
     logger.info(`Attempt: ${attempts} | Elapsed: ${formatDuration(Date.now() - startedAt)}`);
     logger.info("Launching...");
     try {
-      const instance = await computeClient.launchInstance(buildLaunchRequest(config, retryToken));
+      const instance = await withoutOciSdkRetryNoise(() => computeClient.launchInstance(buildLaunchRequest(config, retryToken)));
       return { instance: instance.instance, attempts, startedAt };
     } catch (error) {
       const kind = classifyLaunchError(error);
@@ -58,6 +79,7 @@ export async function pollForCapacity({ computeClient, config, logger, isShuttin
       logger.warn(kind === "capacity" ? "OutOfHostCapacity" : `Transient OCI/network error: ${lastError}`);
       logger.warn(`Last error: ${lastError}`);
       const nextRetryAt = new Date(Date.now() + retryDelayMs).toISOString();
+      recordRetry({ lastError, nextRetryAt, retryDelayMs, consecutive429Count });
       if (isTooManyRequests) {
         logger.warn("HTTP 429 received.");
         logger.info(`Consecutive 429 count: ${consecutive429Count}`);

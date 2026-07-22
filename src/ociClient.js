@@ -45,7 +45,8 @@ export async function createOciClients(config) {
     null,
     common.Region.fromRegionId(config.region)
   );
-  const clientConfig = { authenticationDetailsProvider };
+  // Application-level polling owns all launch retries; disable OCI SDK retries explicitly.
+  const clientConfig = { authenticationDetailsProvider, retryConfiguration: common.NoRetryConfigurationDetails };
   return {
     computeClient: new core.ComputeClient(clientConfig),
     networkClient: new core.VirtualNetworkClient(clientConfig),

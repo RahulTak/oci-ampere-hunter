@@ -8,6 +8,7 @@ import {
   DEFAULT_RETRY_429_MAX_MS,
   DEFAULT_RETRY_429_SECOND_MS,
   DEFAULT_RETRY_INTERVAL_MS,
+  DEFAULT_TELEGRAM_STATUS_INTERVAL_MINUTES,
   REQUIRED_SHAPE
 } from "./constants.js";
 import { parsePositiveNumber } from "./utils.js";
@@ -38,7 +39,15 @@ export function loadConfig(environment = process.env) {
     retryIntervalMs: parsePositiveNumber(environment.DEFAULT_RETRY_MS || environment.RETRY_INTERVAL || DEFAULT_RETRY_INTERVAL_MS, "DEFAULT_RETRY_MS"),
     retry429FirstMs: parsePositiveNumber(environment.RETRY_429_FIRST_MS || DEFAULT_RETRY_429_FIRST_MS, "RETRY_429_FIRST_MS"),
     retry429SecondMs: parsePositiveNumber(environment.RETRY_429_SECOND_MS || DEFAULT_RETRY_429_SECOND_MS, "RETRY_429_SECOND_MS"),
-    retry429MaxMs: parsePositiveNumber(environment.RETRY_429_MAX_MS || DEFAULT_RETRY_429_MAX_MS, "RETRY_429_MAX_MS")
+    retry429MaxMs: parsePositiveNumber(environment.RETRY_429_MAX_MS || DEFAULT_RETRY_429_MAX_MS, "RETRY_429_MAX_MS"),
+    telegramEnabled: environment.TELEGRAM_ENABLED?.trim().toLowerCase() === "true",
+    telegramBotToken: environment.TELEGRAM_BOT_TOKEN?.trim() || "",
+    telegramChatId: environment.TELEGRAM_CHAT_ID?.trim() || "",
+    telegramStatusEnabled: environment.TELEGRAM_STATUS_ENABLED?.trim().toLowerCase() === "true",
+    telegramStatusIntervalMinutes: parsePositiveNumber(
+      environment.TELEGRAM_STATUS_INTERVAL_MINUTES || DEFAULT_TELEGRAM_STATUS_INTERVAL_MINUTES,
+      "TELEGRAM_STATUS_INTERVAL_MINUTES"
+    )
   };
   if (!config.sshPublicKey.startsWith("ssh-")) throw new Error("SSH_PUBLIC_KEY must be a valid OpenSSH public key beginning with ssh-.");
   if (config.shape !== REQUIRED_SHAPE) throw new Error(`SHAPE must be exactly ${REQUIRED_SHAPE}.`);

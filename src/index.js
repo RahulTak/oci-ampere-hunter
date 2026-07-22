@@ -5,11 +5,15 @@ import { closeLogger, logger } from "./logger.js";
 import { createOciClients } from "./ociClient.js";
 import { getInstanceNetworkDetails } from "./launcher.js";
 import { pollForCapacity } from "./poller.js";
+import { NotificationService } from "./notificationService.js";
+import { HeartbeatScheduler } from "./heartbeatScheduler.js";
+import { startRuntimeStatus } from "./runtimeStatus.js";
 import { formatDuration, errorMessage } from "./utils.js";
 import { validateStartup } from "./validator.js";
 
 let shuttingDown = false;
 let shutdownSignalCount = 0;
+let heartbeatScheduler = null;
 
 function requestShutdown(signal) {
   shutdownSignalCount += 1;
@@ -58,17 +62,36 @@ async function main() {
   logger.info(`Startup configuration | Version: ${APP_VERSION} | Region: ${config.region} | Availability Domain: ${config.availabilityDomain} | Shape: ${config.shape}`);
   logger.info(`Startup target | Image OCID: ${config.imageOcid} | Subnet OCID: ${config.subnetOcid} | Instance name: ${config.instanceName} | Retry interval: ${config.retryIntervalMs} ms`);
   logger.info(`Retry configuration | Default retry: ${config.retryIntervalMs / 1000} sec | 429 first: ${config.retry429FirstMs / 1000} sec | 429 second: ${config.retry429SecondMs / 1000} sec | 429 max: ${config.retry429MaxMs / 1000} sec`);
+  logger.info(`Telegram Enabled: ${config.telegramEnabled}`);
+  const notificationService = new NotificationService(config, logger);
   const clients = await createOciClients(config);
   await validateStartup(config, clients, logger);
   logger.info(`Retry Interval: ${config.retryIntervalMs / 1000} sec`);
 
+  startRuntimeStatus();
+  heartbeatScheduler = new HeartbeatScheduler(config, notificationService, logger);
+  heartbeatScheduler.start();
   const result = await pollForCapacity({ ...clients, config, logger, isShuttingDown: () => shuttingDown });
   if (!result) {
     logger.info("Hunter stopped by user.");
     return;
   }
+  heartbeatScheduler.stop();
   logger.info(`Instance accepted by OCI: ${result.instance.id}. Waiting for primary VNIC...`);
   const network = await getInstanceNetworkDetails(clients.computeClient, clients.networkClient, config, result.instance.id);
+  await notificationService.notifyInstanceCreated({
+    instanceName: result.instance.displayName,
+    instanceOcid: result.instance.id,
+    publicIp: network.publicIp,
+    privateIp: network.privateIp,
+    region: config.region,
+    availabilityDomain: result.instance.availabilityDomain,
+    shape: result.instance.shape,
+    ocpus: result.instance.shapeConfig?.ocpus ?? config.ocpus,
+    memoryInGBs: result.instance.shapeConfig?.memoryInGBs ?? config.memoryInGBs,
+    bootVolumeSizeInGBs: config.bootVolumeSizeInGBs,
+    timeCreated: result.instance.timeCreated
+  });
   printSuccess(result.instance, network, config, result.attempts, result.startedAt);
 }
 
@@ -79,5 +102,6 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
+    heartbeatScheduler?.stop();
     await closeLogger();
   });

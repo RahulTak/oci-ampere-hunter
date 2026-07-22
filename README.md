@@ -55,9 +55,16 @@ DEFAULT_RETRY_MS=60000
 RETRY_429_FIRST_MS=120000
 RETRY_429_SECOND_MS=180000
 RETRY_429_MAX_MS=300000
+TELEGRAM_ENABLED=false
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+TELEGRAM_STATUS_ENABLED=true
+TELEGRAM_STATUS_INTERVAL_MINUTES=60
 ```
 
 `SHAPE` must be `VM.Standard.A1.Flex`, and `OCPUS`, `MEMORY_IN_GBS`, and `BOOT_VOLUME_SIZE_IN_GBS` are fixed at `2`, `12`, and `100`. `DEFAULT_RETRY_MS` supersedes the legacy `RETRY_INTERVAL`; the default is 60 seconds. The optional 429 variables default to 120, 180, and 300 seconds when absent.
+
+Telegram is disabled by default. Set `TELEGRAM_ENABLED=true` with a bot token and chat ID to receive one success notification after OCI reports the instance as `RUNNING`. Set `TELEGRAM_STATUS_ENABLED=true` to receive a provider-isolated heartbeat every `TELEGRAM_STATUS_INTERVAL_MINUTES` (60 by default). Notification delivery failures are logged and never stop hunting.
 
 ## Run
 
