@@ -67,6 +67,14 @@ async function main() {
   const clients = await createOciClients(config);
   await validateStartup(config, clients, logger);
   logger.info(`Retry Interval: ${config.retryIntervalMs / 1000} sec`);
+  await notificationService.notifyHunterStarted({
+    region: config.region,
+    availabilityDomain: config.availabilityDomain,
+    instanceName: config.instanceName,
+    heartbeatEnabled: config.telegramStatusEnabled,
+    heartbeatIntervalMinutes: config.telegramStatusIntervalMinutes,
+    time: new Date()
+  });
 
   startRuntimeStatus();
   heartbeatScheduler = new HeartbeatScheduler(config, notificationService, logger);

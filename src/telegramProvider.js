@@ -36,6 +36,27 @@ export class TelegramProvider {
     ].join("\n"));
   }
 
+  async sendHunterStarted(details) {
+    const heartbeat = details.heartbeatEnabled
+      ? `Enabled (${details.heartbeatIntervalMinutes} minute(s))`
+      : "Disabled";
+    return this.send([
+      "🚀 OCI Ampere Hunter Started", "", "Status:\nMonitoring started successfully",
+      "", `Region:\n${display(details.region)}`,
+      "", `Availability Domain:\n${display(details.availabilityDomain)}`,
+      "", `Instance:\n${display(details.instanceName)}`,
+      "", `Heartbeat:\n${heartbeat}`, "", `Time:\n${formatIst(details.time)}`
+    ].join("\n"));
+  }
+
+  async sendTest(details) {
+    return this.send([
+      "✅ OCI Ampere Hunter Notification Test", "",
+      "Telegram configuration is working correctly.", "",
+      `Time:\n${formatIst(details.time)}`
+    ].join("\n"));
+  }
+
   async sendHeartbeat(details) {
     return this.send([
       "🤖 OCI Ampere Hunter Status", "", "Status:\nSearching for Ampere instance...",

@@ -11,20 +11,30 @@ export class NotificationService {
   }
 
   async notifyInstanceCreated(details) {
-    await this.notify("sendInstanceCreated", details);
+    return this.notify("sendInstanceCreated", details);
   }
 
   async notifyHeartbeat(details) {
-    await this.notify("sendHeartbeat", details);
+    return this.notify("sendHeartbeat", details);
+  }
+
+  async notifyHunterStarted(details) {
+    return this.notify("sendHunterStarted", details);
+  }
+
+  async notifyTest(details) {
+    return this.notify("sendTest", details);
   }
 
   async notify(method, details) {
-    await Promise.all(this.providers.map(async (provider) => {
+    const deliveries = await Promise.all(this.providers.map(async (provider) => {
       try {
-        await provider[method](details);
+        return await provider[method](details);
       } catch (error) {
         this.logger.warn(`Notification delivery failed: ${error?.message || "Unknown provider error"}`);
+        return false;
       }
     }));
+    return deliveries.some(Boolean);
   }
 }

@@ -66,6 +66,31 @@ TELEGRAM_STATUS_INTERVAL_MINUTES=60
 
 Telegram is disabled by default. Set `TELEGRAM_ENABLED=true` with a bot token and chat ID to receive one success notification after OCI reports the instance as `RUNNING`. Set `TELEGRAM_STATUS_ENABLED=true` to receive a provider-isolated heartbeat every `TELEGRAM_STATUS_INTERVAL_MINUTES` (60 by default). Notification delivery failures are logged and never stop hunting.
 
+## Telegram Notification Setup
+
+Set these values in `.env`:
+
+```dotenv
+TELEGRAM_ENABLED=true
+TELEGRAM_BOT_TOKEN=123456789:example-token
+TELEGRAM_CHAT_ID=123456789
+TELEGRAM_STATUS_ENABLED=true
+TELEGRAM_STATUS_INTERVAL_MINUTES=60
+```
+
+1. In Telegram, open [@BotFather](https://t.me/BotFather), run `/newbot`, and copy the bot token it provides.
+2. Start a chat with the new bot and send it a message. Obtain the chat ID from the `chat.id` value returned by Telegram's `getUpdates` endpoint, or use a trusted chat-ID helper bot.
+3. Enable delivery with `TELEGRAM_ENABLED=true`; set it to `false` to disable all notification requests. Heartbeats additionally require `TELEGRAM_STATUS_ENABLED=true`.
+4. Verify only the notification path—without starting OCI validation or polling—with:
+
+   ```bash
+   npm run notify:test
+   ```
+
+The test sends `✅ OCI Ampere Hunter Notification Test` with a local timestamp. Normal operation sends a `🚀 OCI Ampere Hunter Started` message after validation, hourly (by default) `🤖 OCI Ampere Hunter Status` messages while searching, and one `🎉 OCI Ampere Instance Created` message after the instance reaches `RUNNING` and its IPs are available.
+
+If delivery fails, the hunter logs a warning and continues. For an invalid bot token, create/copy the token again in BotFather. For an invalid chat ID, confirm the numeric ID and that the bot belongs to the target chat. If the bot has not been started, open its direct chat and send `/start` (or add it to the target group). If the test reports it was skipped, set `TELEGRAM_ENABLED=true`.
+
 ## Run
 
 ```bash
